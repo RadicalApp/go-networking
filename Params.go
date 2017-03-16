@@ -1,5 +1,10 @@
 package go_networking
 
+import (
+	"strconv"
+	"net/url"
+)
+
 type Params struct {
 	stringParams map[string]string
 	intParams    map[string]int
@@ -15,16 +20,35 @@ func NewParams() Params {
 }
 
 // PutString add a key/val pair to the RequestParams, where value is a string.
-func (rp *Params) PutString(key, value string) {
-	rp.stringParams[key] = value
+func (p *Params) PutString(key, value string) {
+	p.stringParams[key] = value
 }
 
 // PutInt add a key/val pair to the RequestParams, where value is an int.
-func (rp *Params) PutInt(key string, value int) {
-	rp.intParams[key] = value
+func (p *Params) PutInt(key string, value int) {
+	p.intParams[key] = value
 }
 
 // PutFile add a key/val pair to the RequestParams, where value is a FileWrapper.
-func (rp *Params) PutFile(key string, value fileWrapper) {
-	rp.fileParams[key] = value
+func (p *Params) PutFile(key string, value fileWrapper) {
+	p.fileParams[key] = value
+}
+
+func (p *Params) urlParameters() map[string]string {
+	params := p.stringParams
+	for key, val := range p.intParams {
+		params[key] = strconv.Itoa(val)
+	}
+	return params
+}
+
+func (p *Params) urlEncodeValues() string {
+	values := url.Values{}
+	for key, value := range p.stringParams {
+		values.Add(key, value)
+	}
+	for key, value := range p.intParams {
+		values.Add(key, strconv.Itoa(value))
+	}
+	return values.Encode()
 }

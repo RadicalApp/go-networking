@@ -1,28 +1,52 @@
 package go_networking
 
 import (
-	"errors"
+	"encoding/base64"
 	"git.cyberdust.com/radicalapp/go-networking/logger"
 	"io/ioutil"
 	"time"
+	"net/http"
+	"io"
+	"bytes"
 )
 
 // Set up logging
 var log = logger.Register("git.cyberdust.com/radicalapp/go-networking")
 
-//const POST string = "POST"
-//const GET string = "GET"
-//const UPLOAD string = "UPLOAD"
+const http_get_method string = "GET"
+const http_post_method string = "POST"
+const http_upload_method string = "UPLOAD"
+
+type Completion func([]byte, error)
+
+// Connection States
+type OnStarted func()
+type OnReceived func([]byte)
+type OnClosed func()
+type OnError func(err error)
+type OnProgress func(progress int)
+
+type basicAuthorization struct {
+	username string
+	password string
+}
 
 type Connection struct {
-	url    string
-	params Params
+	url              string
+	params           Params
+	timeoutInSeconds time.Duration
 
 	headers map[string]string
 
 	// Basic auth variables
-	username    string
-	password    string
+	basicAuthorization basicAuthorization
+
+	// Functions to handle connection states
+	OnStarted  OnStarted
+	OnReceived OnReceived
+	OnClosed   OnClosed
+	OnError    OnError
+	OnProgress OnProgress
 }
 
 // NewConnection creates a new connection with the appropriate Dust auth headers.
@@ -34,15 +58,19 @@ func NewConnection(url string, params Params) *Connection {
 		  url (string): The URL to make the request to. (includes full url)
 		  params ([]string): List of key,value strings to add to the request.
 	*/
-	conn := Connection{url: url, params: params, headers: map[string]string{}}
+	conn := Connection{url: url, params: params, timeoutInSeconds: 30, headers: map[string]string{}}
 
 	return &conn
 }
 
-func (c *Connection) SetBasicAuth(username, password string) {
+func (c *Connection) SetBasicAuth(username string, password string) {
 	log.Debug("Setting basic authentication.")
-	c.username = username
-	c.password = password
+	c.basicAuthorization = basicAuthorization{username: username, password: password}
+}
+
+func (c *Connection) SetTimeout(timeoutInSeconds time.Duration) {
+	log.Debug("Setting timeout in seconds: ", timeoutInSeconds)
+	c.timeoutInSeconds = timeoutInSeconds
 }
 
 func (c *Connection) PutHeader(key, value string) {
@@ -50,119 +78,93 @@ func (c *Connection) PutHeader(key, value string) {
 	c.headers[key] = value
 }
 
-func (c *Connection) GET() ([]byte, error) {
-	log.Debug("GET Request")
+func (c *Connection) GET(completion Completion) {
+	c.makeRequest(http_get_method, completion)
 }
 
-func (c *Connection) POST() ([]byte, error) {
-	log.Debug("POST Request")
-	return nil, nil
+func (c *Connection) POST(completion Completion) {
+	c.makeRequest(http_post_method, completion)
 }
 
-func (c *Connection) UPLOAD() ([]byte, error) {
-	log.Debug("UPLOAD Request")
-	return nil, nil
+func (c *Connection) UPLOAD(completion Completion) {
+	c.makeRequest(http_upload_method, completion)
 }
 
-func (c *Connection) send(method string) ([]byte, error) {
-	return nil, nil
+func (c *Connection) makeRequest(method string, completion Completion) {
+	c.OnStarted()
+	body := c.makeBody(method)
+
+	req, err := http.NewRequest(method, c.url, body)
+	c.makeParams(method, req)
+	if err != nil {
+		c.OnError(err)
+		completion(nil, err)
+
+	} else {
+		// Set the headers of the request
+		if &c.basicAuthorization != nil {
+			encoded := base64.StdEncoding.EncodeToString([]byte(c.basicAuthorization.username + ":" + c.basicAuthorization.password))
+			c.PutHeader("Authorization", "Bearer " + encoded)
+		}
+		for key, val := range c.headers {
+			req.Header.Set(key, val)
+		}
+		go c.doRequest(req, completion)
+	}
 }
 
-
-func (c *Connection) sendGet(method string) ([]byte, error) {
-	return nil, nil
+func (c *Connection) makeParams(method string, req *http.Request) {
+	if method != http_upload_method {
+		req.URL.RawQuery = c.params.urlEncodeValues()
+	}
 }
 
-func (c *Connection) sendPost(method string) ([]byte, error) {
-	return nil, nil
+func (c *Connection) makeBody(method string) *bytes.Buffer {
+	if method == http_upload_method {
+		body := &bytes.Buffer{}
+		writer := newByteWriter(body)
+		defer writer.close()
+
+		for key, val := range c.params.urlParameters() {
+			_ = writer.w.WriteField(key, val)
+		}
+
+		isMultipart := false
+		for key, val := range c.params.fileParams {
+			if val.path == "" {
+				_ = writer.writeByteField(key, val.data, val.name)
+			} else {
+				_ = writer.writeFileField(key, val.path, val.name)
+			}
+			isMultipart = true
+		}
+
+		if isMultipart {
+			c.PutHeader("Content-Type", writer.w.FormDataContentType())
+		}
+
+		return body
+	}
+	return nil
 }
 
+func (c *Connection) doRequest(req *http.Request, completion Completion) ([]byte, error) {
+	client := &http.Client{
+		Timeout: c.timeoutInSeconds * time.Second,
+	}
 
-func (c *Connection) sendUpload(method string) ([]byte, error) {
-	return nil, nil
-}
+	response, err := client.Do(req)
 
-
-func (c *Connection) makeRequest(method string) ([]byte, error) {
-	/*
-		MakeRequest makes an HTTP request to the provided URL.
-
-		Args:
-			method (str): GET or POST
-		  	url (str): The address to make the request on.
-			headers ([]str): List of headers to include with the request.
-			params ([]str): List of parameters to include with the request.
-	*/
-	//log.Debug("Making request:", method)
-	//log.Debug("  Headers:")
-	//for i, value := range headers {
-	//	if i%2 == 1 {
-	//		log.Debug("   ", headers[i-1]+":", value)
-	//	}
-	//}
-	//log.Debug("  Params:")
-	//for i, value := range params {
-	//	if i%2 == 1 {
-	//		log.Debug("   ", params[i-1]+":", value)
-	//	}
-	//}
-	//
-	//client := &http.Client{
-	//	Timeout: 30 * time.Second,
-	//}
-	//req, err := http.NewRequest(method, url, nil)
-	//
-	//if len(params)%2 != 0 {
-	//	paramErr := errors.New("Must have key and value for params")
-	//	log.Error(paramErr)
-	//	d.ConnectionState = ConnectionStateDisconnected
-	//	//d.OnError(paramErr)
-	//	return nil, paramErr
-	//}
-	//
-	//// Set the request parameters
-	//values := req.URL.Query()
-	//for i := 0; i < len(params); i += 2 {
-	//	values.Add(params[i], params[i+1])
-	//}
-	//req.URL.RawQuery = values.Encode()
-	//
-	//// Set the headers of the request
-	//for i := 0; i < len(headers); i += 2 {
-	//	req.Header.Set(headers[i], headers[i+1])
-	//}
-	//
-	//// Make the request
-	//d.ConnectionState = ConnectionStateConnecting
-	////d.OnStarted()
-	//response, err := client.Do(req)
-	//if err != nil {
-	//	d.ConnectionState = ConnectionStateDisconnected
-	//	return nil, err
-	//}
-	//d.ConnectionState = ConnectionStateConnected
-	////d.OnReceived(u.GenerateUUID())
-	//
-	//// Read the contents of the response
-	//defer response.Body.Close()
-	//contents, err := ioutil.ReadAll(response.Body)
-	//if err != nil {
-	//	log.Error(err)
-	//	//d.OnError(err)
-	//	return nil, err
-	//}
-	//
-	//log.Debug("With URL: ", url)
-	//log.Debug("Recieved response code:", response.StatusCode)
-	//log.Debug("Response:", string(contents))
-	//
-	//if response.StatusCode != 200 {
-	//	statusErr := errors.New("Recieved non 200 status response.")
-	//	//d.OnError(statusErr)
-	//	return contents, statusErr
-	//}
-	//
-	////d.OnClosed()
-
-	return nil, nil
+	defer response.Body.Close()
+	contents, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Error(err)
+		c.OnError(err)
+		completion(nil, err)
+		return nil, err
+	} else {
+		c.OnReceived(contents)
+		c.OnClosed()
+		return contents, nil
+	}
 }
