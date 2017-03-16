@@ -12,14 +12,14 @@ import (
 // Set up logging
 var log = logger.Register("git.cyberdust.com/radicalapp/go-networking")
 
+type HTTP_METHOD string
 const (
-	http_get_method    string = "GET"
-	http_post_method   string = "POST"
-	http_upload_method string = "UPLOAD"
+	HTTP_METHOD_GET    HTTP_METHOD = "GET"
+	HTTP_METHOD_POST   HTTP_METHOD = "POST"
+	HTTP_METHOD_UPLOAD HTTP_METHOD = "UPLOAD"
 )
 
 type ConnectionState int
-
 const (
 	CONNECTION_STATE_DISCONNECTED ConnectionState = 0
 	CONNECTION_STATE_CONNECTING   ConnectionState = 1
@@ -28,6 +28,18 @@ const (
 	//CONNECTION_STATE_RECONNECTING ConnectionState = 3
 	//CONNECTION_STATE_FAILED ConnectionState = 4
 )
+func (c ConnectionState) ToString() string {
+	switch c {
+	case CONNECTION_STATE_DISCONNECTED:
+		return "Disconnected"
+	case CONNECTION_STATE_CONNECTING:
+		return "Connecting"
+	case CONNECTION_STATE_CONNECTED:
+		return "Connected"
+	default:
+		return "INVALID STATE"
+	}
+}
 
 type Completion func([]byte, error)
 
@@ -49,10 +61,10 @@ type IdealResponse interface {
 }
 
 type Connection struct {
-	url              string
+	urlString        string
 	params           Params
 	timeoutInSeconds time.Duration
-	method           string
+	method           HTTP_METHOD
 	state            ConnectionState
 	numberOfRetries  int
 	headers          map[string]string
@@ -73,7 +85,7 @@ type Connection struct {
 }
 
 // NewConnection creates a new connection with the appropriate Dust auth headers.
-func NewConnection(url string, params Params) *Connection {
+func NewConnection(urlString string, params Params) *Connection {
 	/*
 		Creates a new connection with the appropriate Dust auth headers.
 
@@ -81,7 +93,7 @@ func NewConnection(url string, params Params) *Connection {
 		  url (string): The URL to make the request to. (includes full url)
 		  params ([]string): List of key,value strings to add to the request.
 	*/
-	conn := Connection{url: url, params: params, timeoutInSeconds: 30, headers: map[string]string{}}
+	conn := Connection{urlString: urlString, params: params, timeoutInSeconds: 30, headers: map[string]string{}}
 
 	return &conn
 }
@@ -89,6 +101,11 @@ func NewConnection(url string, params Params) *Connection {
 func (c *Connection) SetBasicAuth(username string, password string) {
 	log.Debug("Setting basic authentication.")
 	c.basicAuthorization = basicAuthorization{username: username, password: password}
+}
+
+func (c *Connection) SetMethod(method HTTP_METHOD) {
+	log.Debug("Setting method to :", string(method))
+	c.method = method
 }
 
 func (c *Connection) SetTimeout(timeoutInSeconds time.Duration) {
@@ -106,19 +123,31 @@ func (c *Connection) SetNumberOfRetries(number int) {
 	c.numberOfRetries = number
 }
 
-func (c *Connection) GET(completion Completion) {
+func (c *Connection) GET() {
+	c.Get(nil)
+}
+
+func (c *Connection) Get(completion Completion) {
 	log.Debug("GET")
-	c.method = http_get_method
+	c.method = HTTP_METHOD_GET
 	c.makeRequest(completion)
 }
 
-func (c *Connection) POST(completion Completion) {
-	c.method = http_post_method
+func (c *Connection) POST() {
+	c.Post(nil)
+}
+
+func (c *Connection) Post(completion Completion) {
+	c.method = HTTP_METHOD_POST
 	c.makeRequest(completion)
 }
 
-func (c *Connection) UPLOAD(completion Completion) {
-	c.method = http_upload_method
+func (c *Connection) UPLOAD() {
+	c.Upload(nil)
+}
+
+func (c *Connection) Upload(completion Completion) {
+	c.method = HTTP_METHOD_UPLOAD
 	c.makeRequest(completion)
 }
 
@@ -135,16 +164,19 @@ func (c *Connection) makeRequest(completion Completion) {
 	}
 	c.changeState(CONNECTION_STATE_DISCONNECTED, CONNECTION_STATE_CONNECTING)
 
-	//body := c.makeBody(method)
+	body := c.makeBody()
 
-	req, err := http.NewRequest(c.method, c.url, nil)
+	log.Debug("Method ", string(c.method))
+
+	req, err := http.NewRequest(string(c.method), c.urlString, body)
 	c.makeParams(req)
 	if err != nil {
 		if c.OnError != nil {
 			c.OnError(err)
 		}
-		completion(nil, err)
-
+		if completion != nil {
+			completion(nil, err)
+		}
 	} else {
 		// Set the headers of the request
 		if &c.basicAuthorization != nil {
@@ -155,19 +187,19 @@ func (c *Connection) makeRequest(completion Completion) {
 		for key, val := range c.headers {
 			req.Header.Set(key, val)
 		}
-		go c.doRequest(req, completion)
+		c.doRequest(req, completion)
 	}
 }
 
 func (c *Connection) makeParams(req *http.Request) {
-	if c.method != http_upload_method {
+	if c.method != HTTP_METHOD_UPLOAD {
 		req.URL.RawQuery = c.params.urlEncodeValues()
 	}
 }
 
-func (c *Connection) makeBody(method string) *bytes.Buffer {
-	if method == http_upload_method {
-		body := &bytes.Buffer{}
+func (c *Connection) makeBody() *bytes.Buffer {
+	body := &bytes.Buffer{}
+	if c.method == HTTP_METHOD_UPLOAD {
 		writer := newByteWriter(body)
 		defer writer.close()
 
@@ -188,10 +220,8 @@ func (c *Connection) makeBody(method string) *bytes.Buffer {
 		if isMultipart {
 			c.PutHeader("Content-Type", writer.w.FormDataContentType())
 		}
-
-		return body
 	}
-	return nil
+	return body
 }
 
 func (c *Connection) doRequest(req *http.Request, completion Completion) {
@@ -217,7 +247,7 @@ func (c *Connection) doRequest(req *http.Request, completion Completion) {
 
 func (c *Connection) changeState(from, to ConnectionState) {
 	// MAYBE GUARANTEE CORRECT STATE CHANGE, IN FUTURE
-	log.Debug("Changing state from: ", from, " to: ", to)
+	log.Debug("Changing state from: ", from.ToString(), " to: ", to.ToString())
 	c.state = to
 	if c.OnStateChanged != nil {
 		c.OnStateChanged(to)
@@ -234,7 +264,9 @@ func (c *Connection) processError(err error, completion Completion) {
 		if c.OnError != nil {
 			c.OnError(err)
 		}
-		completion(nil, err)
+		if completion != nil {
+			completion(nil, err)
+		}
 	}
 }
 
@@ -247,5 +279,7 @@ func (c *Connection) processResponse(response []byte, completion Completion) {
 	if c.OnClosed != nil {
 		c.OnClosed()
 	}
-	completion(response, nil)
+	if completion != nil {
+		completion(response, nil)
+	}
 }
