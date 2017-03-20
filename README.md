@@ -1,4 +1,4 @@
-[![Latest Tag](https://img.shields.io/badge/tag-0.1.0-green.svg?style=flat)](tags/0.1.0)
+[![Latest Tag](https://img.shields.io/badge/tag-0.1.0-green.svg?style=flat)](https://github.com/RadicalApp/go-networking/releases/tag/0.1.0)
 [![Twitter](https://img.shields.io/badge/twitter-@DustMessaging-blue.svg?style=flat)](https://twitter.com/dustmessaging)
 
 # go-networking
@@ -9,10 +9,8 @@
 ## Installation
 
 ```go
-import "git.cyberdust.com/radicalapp/go-networking"
+import "github.com/RadicalApp/go-networking"
 ```
-
-> Update to github url
 
 
 ## Usage
@@ -57,6 +55,8 @@ Simplest way to use `go-networking` create an instance of `connection` and call 
 Main contributors are:
 - [Rohit Kotian](rohit@usedust.com)
 - [Elliot Sperling](elliot@usedust.com)
+
+Thanks for [JSONPlaceholder](https://jsonplaceholder.typicode.com/) for having test APIs.
 
 If you wish to contribute to the project please follow the [guidelines](CONTRIBUTING.md).
 
