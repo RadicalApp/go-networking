@@ -56,6 +56,10 @@ type basicAuthorization struct {
 	password string
 }
 
+func (b *basicAuthorization) isEmpty() bool {
+	return (len(b.username) == 0) && (len(b.password) == 0)
+}
+
 type IdealResponse interface {
 	getIdealResponseTemplate() interface{}
 }
@@ -179,7 +183,7 @@ func (c *Connection) makeRequest(completion Completion) {
 		}
 	} else {
 		// Set the headers of the request
-		if &c.basicAuthorization != nil {
+		if !c.basicAuthorization.isEmpty() {
 			encoded := base64.StdEncoding.EncodeToString([]byte(c.basicAuthorization.username + ":" + c.basicAuthorization.password))
 			c.PutHeader("Authorization", "Basic "+encoded)
 
