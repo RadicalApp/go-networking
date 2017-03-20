@@ -14,18 +14,30 @@ func TestGetConnection(t *testing.T) {
 	connection.OnReceived = func(response []byte) {
 		fmt.Println("Response: !!! ", string(response))
 	}
+	connection.OnError = func (err error) {
+		t.Error("Error in GET request for url: ", urlString)
+		t.Fail()
+	}
 
 	connection.GET()
 }
 
-//func TestPostConnection(t *testing.T) {
-//
-//}
+func TestPostConnection(t *testing.T) {
+	urlString := "https://jsonplaceholder.typicode.com/posts"
 
-//func TestUploadConnection(t *testing.T) {
-//
-//}
+	params := networking.NewParams()
+	params.PutString("title", "foo")
+	params.PutString("body", "bar")
+	params.PutInt("userId", 1)
 
+	connection := networking.NewConnection(urlString, params)
+	connection.OnReceived = func (response []byte) {
+		fmt.Println("Response: !!! ", string(response))
+	}
+	connection.OnError = func (err error) {
+		t.Error("Error in POST request for url: ", urlString)
+		t.Fail()
+	}
+	connection.POST()
 
-//connection := networking.NewConnection(url).WithParams(params).WithCompletion(completion).WithOnReveived(received).GET()
-
+}
