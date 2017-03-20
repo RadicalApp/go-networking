@@ -48,9 +48,9 @@ Simplest way to use `go-networking` create an instance of `connection` and call 
 
 ## Credits
 
-`go-networking` is owned and maintained by the [Radical App, LLC] (https://usedust.com/)
+`go-networking` is owned and maintained by the [Radical App, LLC](https://usedust.com/)
 
-`go-networking` was created in order to cater towards the development of [Dust App] (https://usedust.com/) which uses RESTful service for all activities.
+`go-networking` was created in order to cater towards the development of [Dust App](https://usedust.com/) which uses RESTful service for all activities.
 
 Main contributors are:
 - [Rohit Kotian](rohit@usedust.com)
