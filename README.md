@@ -1,4 +1,4 @@
-[![Latest Tag](https://img.shields.io/badge/tag-0.1.1-green.svg?style=flat)](https://github.com/RadicalApp/go-networking/releases/tag/0.1.1)
+[![Latest Tag](https://img.shields.io/badge/tag-0.2.0-green.svg?style=flat)](https://github.com/RadicalApp/go-networking/releases/tag/0.1.1)
 [![Twitter](https://img.shields.io/badge/twitter-@DustMessaging-blue.svg?style=flat)](https://twitter.com/dustmessaging)
 
 # go-networking
