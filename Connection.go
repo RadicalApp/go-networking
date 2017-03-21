@@ -13,6 +13,7 @@ import (
 var log = logger.Register("git.cyberdust.com/radicalapp/go-networking")
 
 type HTTP_METHOD string
+
 const (
 	HTTP_METHOD_GET    HTTP_METHOD = "GET"
 	HTTP_METHOD_POST   HTTP_METHOD = "POST"
@@ -20,6 +21,7 @@ const (
 )
 
 type ConnectionState int
+
 const (
 	CONNECTION_STATE_DISCONNECTED ConnectionState = 0
 	CONNECTION_STATE_CONNECTING   ConnectionState = 1
@@ -28,6 +30,7 @@ const (
 	//CONNECTION_STATE_RECONNECTING ConnectionState = 3
 	//CONNECTION_STATE_FAILED ConnectionState = 4
 )
+
 func (c ConnectionState) ToString() string {
 	switch c {
 	case CONNECTION_STATE_DISCONNECTED:
@@ -40,8 +43,6 @@ func (c ConnectionState) ToString() string {
 		return "INVALID STATE"
 	}
 }
-
-type Completion func([]byte, error)
 
 // Connection States
 type OnStarted func()
@@ -131,7 +132,7 @@ func (c *Connection) GET() {
 	c.Get(nil)
 }
 
-func (c *Connection) Get(completion Completion) {
+func (c *Connection) Get(completion func([]byte, error)) {
 	log.Debug("GET")
 	c.method = HTTP_METHOD_GET
 	c.makeRequest(completion)
@@ -141,7 +142,7 @@ func (c *Connection) POST() {
 	c.Post(nil)
 }
 
-func (c *Connection) Post(completion Completion) {
+func (c *Connection) Post(completion func([]byte, error)) {
 	c.method = HTTP_METHOD_POST
 	c.makeRequest(completion)
 }
@@ -150,12 +151,12 @@ func (c *Connection) UPLOAD() {
 	c.Upload(nil)
 }
 
-func (c *Connection) Upload(completion Completion) {
+func (c *Connection) Upload(completion func([]byte, error)) {
 	c.method = HTTP_METHOD_UPLOAD
 	c.makeRequest(completion)
 }
 
-func (c *Connection) makeRequest(completion Completion) {
+func (c *Connection) makeRequest(completion func([]byte, error)) {
 	//if c.guaranteeExecution {
 	//	if c.idealResponse == nil {
 	//		err := errors.New("Ideal response not configured")
@@ -228,7 +229,7 @@ func (c *Connection) makeBody() *bytes.Buffer {
 	return body
 }
 
-func (c *Connection) doRequest(req *http.Request, completion Completion) {
+func (c *Connection) doRequest(req *http.Request, completion func([]byte, error)) {
 	log.Debug("Doing request")
 	client := &http.Client{
 		Timeout: c.timeoutInSeconds * time.Second,
@@ -260,7 +261,7 @@ func (c *Connection) changeState(from, to ConnectionState) {
 	}
 }
 
-func (c *Connection) processError(err error, completion Completion) {
+func (c *Connection) processError(err error, completion func([]byte, error)) {
 	c.changeState(CONNECTION_STATE_CONNECTED, CONNECTION_STATE_DISCONNECTED)
 	if c.numberOfRetries > 0 {
 		c.numberOfRetries--
@@ -276,7 +277,7 @@ func (c *Connection) processError(err error, completion Completion) {
 	}
 }
 
-func (c *Connection) processResponse(response []byte, completion Completion) {
+func (c *Connection) processResponse(response []byte, completion func([]byte, error)) {
 	log.Debug("Processing response")
 	c.changeState(CONNECTION_STATE_CONNECTED, CONNECTION_STATE_DISCONNECTED)
 	if c.OnReceived != nil {
