@@ -20,33 +20,38 @@ const (
 	HTTP_METHOD_UPLOAD HTTP_METHOD = "UPLOAD"
 )
 
-type ConnectionState int
+type ConnectionState string
 
 const (
-	CONNECTION_STATE_DISCONNECTED ConnectionState = 0
-	CONNECTION_STATE_CONNECTING   ConnectionState = 1
-	CONNECTION_STATE_CONNECTED    ConnectionState = 2
+	CONNECTION_STATE_DISCONNECTED ConnectionState = "Disconnected"
+	CONNECTION_STATE_CONNECTING   ConnectionState = "Connecting"
+	CONNECTION_STATE_CONNECTED    ConnectionState = "Connected"
 	// MAYBE IN FUTURE...?
 	//CONNECTION_STATE_RECONNECTING ConnectionState = 3
 	//CONNECTION_STATE_FAILED ConnectionState = 4
 )
 
-func (c ConnectionState) ToString() string {
-	switch c {
-	case CONNECTION_STATE_DISCONNECTED:
-		return "Disconnected"
-	case CONNECTION_STATE_CONNECTING:
-		return "Connecting"
-	case CONNECTION_STATE_CONNECTED:
-		return "Connected"
-	default:
-		return "INVALID STATE"
-	}
+type Response struct {
+	Data     []byte
+	Request  http.Request
+	Response http.Response
+}
+
+func newResponse(data []byte, request http.Request, response http.Response) *Response {
+	return &Response{Data: data, Request: request, Response: response}
+}
+
+func emptyResponse() *Response {
+	return &Response{}
+}
+
+func (r *Response) IsEmpty() bool {
+	return r == emptyResponse()
 }
 
 // Connection States
 type OnStarted func()
-type OnReceived func([]byte)
+type OnReceived func(response Response)
 type OnClosed func()
 type OnError func(err error)
 type OnProgress func(progress int)
@@ -132,7 +137,7 @@ func (c *Connection) GET() {
 	c.Get(nil)
 }
 
-func (c *Connection) Get(completion func([]byte, error)) {
+func (c *Connection) Get(completion func(Response, error)) {
 	log.Debug("GET")
 	c.method = HTTP_METHOD_GET
 	c.makeRequest(completion)
@@ -142,7 +147,7 @@ func (c *Connection) POST() {
 	c.Post(nil)
 }
 
-func (c *Connection) Post(completion func([]byte, error)) {
+func (c *Connection) Post(completion func(Response, error)) {
 	c.method = HTTP_METHOD_POST
 	c.makeRequest(completion)
 }
@@ -151,12 +156,12 @@ func (c *Connection) UPLOAD() {
 	c.Upload(nil)
 }
 
-func (c *Connection) Upload(completion func([]byte, error)) {
+func (c *Connection) Upload(completion func(Response, error)) {
 	c.method = HTTP_METHOD_UPLOAD
 	c.makeRequest(completion)
 }
 
-func (c *Connection) makeRequest(completion func([]byte, error)) {
+func (c *Connection) makeRequest(completion func(Response, error)) {
 	//if c.guaranteeExecution {
 	//	if c.idealResponse == nil {
 	//		err := errors.New("Ideal response not configured")
@@ -174,15 +179,10 @@ func (c *Connection) makeRequest(completion func([]byte, error)) {
 	log.Debug("Method ", string(c.method))
 
 	req, err := http.NewRequest(string(c.method), c.urlString, body)
-	c.makeParams(req)
 	if err != nil {
-		if c.OnError != nil {
-			c.OnError(err)
-		}
-		if completion != nil {
-			completion(nil, err)
-		}
+		c.processError(err, completion)
 	} else {
+		c.makeParams(req)
 		// Set the headers of the request
 		if !c.basicAuthorization.isEmpty() {
 			encoded := base64.StdEncoding.EncodeToString([]byte(c.basicAuthorization.username + ":" + c.basicAuthorization.password))
@@ -229,7 +229,7 @@ func (c *Connection) makeBody() *bytes.Buffer {
 	return body
 }
 
-func (c *Connection) doRequest(req *http.Request, completion func([]byte, error)) {
+func (c *Connection) doRequest(req *http.Request, completion func(Response, error)) {
 	log.Debug("Doing request")
 	client := &http.Client{
 		Timeout: c.timeoutInSeconds * time.Second,
@@ -237,31 +237,23 @@ func (c *Connection) doRequest(req *http.Request, completion func([]byte, error)
 
 	c.changeState(CONNECTION_STATE_CONNECTING, CONNECTION_STATE_CONNECTED)
 	response, err := client.Do(req)
-	if response != nil {
-		defer response.Body.Close()
-	}
 	if err != nil {
 		c.processError(err, completion)
 	} else {
-		contents, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			c.processError(err, completion)
-		} else {
-			c.processResponse(contents, completion)
-		}
+		c.processResponse(req, response, completion)
 	}
 }
 
 func (c *Connection) changeState(from, to ConnectionState) {
 	// MAYBE GUARANTEE CORRECT STATE CHANGE, IN FUTURE
-	log.Debug("Changing state from: ", from.ToString(), " to: ", to.ToString())
+	log.Debug("Changing state from: ", string(from), " to: ", string(to))
 	c.state = to
 	if c.OnStateChanged != nil {
 		c.OnStateChanged(to)
 	}
 }
 
-func (c *Connection) processError(err error, completion func([]byte, error)) {
+func (c *Connection) processError(err error, completion func(Response, error)) {
 	c.changeState(CONNECTION_STATE_CONNECTED, CONNECTION_STATE_DISCONNECTED)
 	if c.numberOfRetries > 0 {
 		c.numberOfRetries--
@@ -272,21 +264,33 @@ func (c *Connection) processError(err error, completion func([]byte, error)) {
 			c.OnError(err)
 		}
 		if completion != nil {
-			completion(nil, err)
+			completion(*emptyResponse(), err)
+		}
+		if c.OnClosed != nil {
+			c.OnClosed()
 		}
 	}
 }
 
-func (c *Connection) processResponse(response []byte, completion func([]byte, error)) {
+func (c *Connection) processResponse(req *http.Request, res *http.Response, completion func(Response, error)) {
 	log.Debug("Processing response")
 	c.changeState(CONNECTION_STATE_CONNECTED, CONNECTION_STATE_DISCONNECTED)
-	if c.OnReceived != nil {
-		c.OnReceived(response)
-	}
-	if c.OnClosed != nil {
-		c.OnClosed()
-	}
-	if completion != nil {
-		completion(response, nil)
+
+	defer res.Body.Close()
+	contents, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		c.processError(err, completion)
+	} else {
+		response := newResponse(contents, *req, *res)
+
+		if c.OnReceived != nil {
+			c.OnReceived(*response)
+		}
+		if completion != nil {
+			completion(*response, nil)
+		}
+		if c.OnClosed != nil {
+			c.OnClosed()
+		}
 	}
 }

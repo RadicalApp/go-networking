@@ -14,8 +14,8 @@ func TestGetConnection(t *testing.T) {
 	g := goblin.Goblin(t)
 	g.Describe("Get dummy json", func() {
 		g.It("Should get dummy json data", func(done goblin.Done) {
-			connection.OnReceived = func(response []byte) {
-				t.Log("Response: !!! ", string(response))
+			connection.OnReceived = func(response networking.Response) {
+				t.Log("Response: !!! ", string(response.Data))
 				done()
 			}
 			connection.OnError = func(err error) {
@@ -40,17 +40,15 @@ func TestPostConnection(t *testing.T) {
 	g := goblin.Goblin(t)
 	g.Describe("Post dummy data", func() {
 		g.It("Should post dummy data", func(done goblin.Done) {
-			connection.OnReceived = func(response []byte) {
-				t.Log("Response: !!! ", string(response))
+			connection.OnReceived = func(response networking.Response) {
+				t.Log("Response: !!! ", string(response.Data))
 				done()
 			}
-
 			connection.OnError = func(err error) {
 				t.Error("Error in POST request for url: ", urlString)
 				t.Fail()
 				done()
 			}
-
 			connection.POST()
 		})
 	})
@@ -64,17 +62,15 @@ func TestFailConnection(t *testing.T) {
 	g := goblin.Goblin(t)
 	g.Describe("Hit fake url", func() {
 		g.It("Should fail to connect to fake url", func(done goblin.Done) {
-			connection.OnReceived = func(response []byte) {
+			connection.OnReceived = func(response networking.Response) {
 				t.Error("Incorrectly passed...", urlString)
 				t.Fail()
 				done()
 			}
-
 			connection.OnError = func(err error) {
 				t.Log("Successfully failed!")
 				done()
 			}
-
 			connection.GET()
 		})
 	})
