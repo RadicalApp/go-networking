@@ -191,7 +191,7 @@ func (c *Connection) makeRequest(completion Completion) {
 		for key, val := range c.headers {
 			req.Header.Set(key, val)
 		}
-		c.doRequest(req, completion)
+		go c.doRequest(req, completion)
 	}
 }
 
@@ -236,7 +236,9 @@ func (c *Connection) doRequest(req *http.Request, completion Completion) {
 
 	c.changeState(CONNECTION_STATE_CONNECTING, CONNECTION_STATE_CONNECTED)
 	response, err := client.Do(req)
-	defer response.Body.Close()
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		c.processError(err, completion)
 	} else {
