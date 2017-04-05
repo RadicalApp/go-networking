@@ -31,6 +31,7 @@ const (
 	//CONNECTION_STATE_FAILED ConnectionState = 4
 )
 
+// `Response` a struct that defines the response for a particular connection
 type Response struct {
 	Data     []byte
 	Request  http.Request
@@ -45,6 +46,7 @@ func emptyResponse() *Response {
 	return &Response{}
 }
 
+// Check if a `Response` is empty
 func (r *Response) IsEmpty() bool {
 	return r == emptyResponse()
 }
@@ -66,10 +68,12 @@ func (b *basicAuthorization) isEmpty() bool {
 	return (len(b.username) == 0) && (len(b.password) == 0)
 }
 
+// Future implementation for offline usage
 type IdealResponse interface {
 	getIdealResponseTemplate() interface{}
 }
 
+// `Connection` a struct to help connect to the real world
 type Connection struct {
 	urlString        string
 	params           Params
@@ -108,54 +112,67 @@ func NewConnection(urlString string, params Params) *Connection {
 	return &conn
 }
 
+// Add basic authorization to the headers
 func (c *Connection) SetBasicAuth(username string, password string) {
 	log.Debug("Setting basic authentication.")
 	c.basicAuthorization = basicAuthorization{username: username, password: password}
 }
 
+// Set method type. E.g.: GET, POST
 func (c *Connection) SetMethod(method HTTP_METHOD) {
 	log.Debug("Setting method to :", string(method))
 	c.method = method
 }
 
+// Set timeout for the connection
 func (c *Connection) SetTimeout(timeoutInSeconds time.Duration) {
 	log.Debug("Setting timeout in seconds: ", timeoutInSeconds)
 	c.timeoutInSeconds = timeoutInSeconds
 }
 
+// Add header, like Authorization or custom
 func (c *Connection) PutHeader(key, value string) {
 	log.Debug("Adding header with key, val: ", key, ", ", value)
 	c.headers[key] = value
 }
 
+// Set number of retries for a HTTP request
 func (c *Connection) SetNumberOfRetries(number int) {
 	log.Debug("Setting number of retries: ", number)
 	c.numberOfRetries = number
 }
 
+// Helper to send GET request
 func (c *Connection) GET() {
 	c.Get(nil)
 }
 
+// Helper to send GET request with completion
 func (c *Connection) Get(completion func(Response, error)) {
 	log.Debug("GET")
 	c.method = HTTP_METHOD_GET
 	c.makeRequest(completion)
 }
 
+// Helper to send POST request
 func (c *Connection) POST() {
 	c.Post(nil)
 }
 
+// Helper to send POST request with completion
 func (c *Connection) Post(completion func(Response, error)) {
 	c.method = HTTP_METHOD_POST
 	c.makeRequest(completion)
 }
 
+// Helper to send UPLOAD (type of POST request) request
+// This should be used while POST'ing MULTIPART-FORM
 func (c *Connection) UPLOAD() {
 	c.Upload(nil)
 }
 
+// Helper to send UPLOAD (type of POST request) request with completion
+// This should be used while POST'ing MULTIPART-FORM
 func (c *Connection) Upload(completion func(Response, error)) {
 	c.method = HTTP_METHOD_UPLOAD
 	c.makeRequest(completion)

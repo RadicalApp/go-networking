@@ -1,21 +1,23 @@
 package go_networking
 
 import (
-	"strconv"
 	"net/url"
+	"strconv"
 )
 
+// `Params` a wrapper struct to hold URL/ File/ Post parameters for HTTP Connection
 type Params struct {
 	stringParams map[string]string
 	intParams    map[string]int
-	fileParams   map[string]fileWrapper
+	fileParams   map[string]FileWrapper
 }
 
+// Constructor for `Params`
 func NewParams() Params {
 	return Params{
 		stringParams: map[string]string{},
 		intParams:    map[string]int{},
-		fileParams:   map[string]fileWrapper{},
+		fileParams:   map[string]FileWrapper{},
 	}
 }
 
@@ -30,10 +32,11 @@ func (p *Params) PutInt(key string, value int) {
 }
 
 // PutFile add a key/val pair to the RequestParams, where value is a FileWrapper.
-func (p *Params) PutFile(key string, value fileWrapper) {
+func (p *Params) PutFile(key string, value FileWrapper) {
 	p.fileParams[key] = value
 }
 
+// Internal method to get url parameters for HTTP request
 func (p *Params) urlParameters() map[string]string {
 	params := p.stringParams
 	for key, val := range p.intParams {
@@ -42,6 +45,7 @@ func (p *Params) urlParameters() map[string]string {
 	return params
 }
 
+// Internal method to get url encoded values for HTTP request
 func (p *Params) urlEncodeValues() string {
 	values := url.Values{}
 	for key, value := range p.stringParams {

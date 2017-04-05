@@ -1,15 +1,15 @@
 package go_networking
 
 // FileWrapper contains all necessary file data for upload.
-type fileWrapper struct {
+type FileWrapper struct {
 	data        []byte // raw data
 	name        string // file name
 	contentType string // content type
 	path        string
 }
 
-func newFileWrapper() fileWrapper {
-	return fileWrapper{
+func NewFileWrapper() FileWrapper {
+	return FileWrapper{
 		name:        "dusty.dust",
 		contentType: "application/octet-stream",
 	}
@@ -17,12 +17,12 @@ func newFileWrapper() fileWrapper {
 
 // FileWrapperBuilder implements builder pattern to construct a FileWrapper
 type FileWrapperBuilder struct {
-	fw fileWrapper
+	fw FileWrapper
 }
 
 func NewFileWrapperBuilder() *FileWrapperBuilder {
 	return &FileWrapperBuilder{
-		fw: newFileWrapper(),
+		fw: NewFileWrapper(),
 	}
 }
 
@@ -46,6 +46,6 @@ func (fwb *FileWrapperBuilder) SetPath(path string) *FileWrapperBuilder {
 	return fwb
 }
 
-func (fwb *FileWrapperBuilder) Build() fileWrapper {
+func (fwb *FileWrapperBuilder) Build() FileWrapper {
 	return fwb.fw
 }
