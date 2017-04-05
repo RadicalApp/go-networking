@@ -12,8 +12,8 @@ func (cb *ConnectionBuilder) SetUrlString(urlString string) *ConnectionBuilder {
 }
 
 // Set `Params` for a HTTP request
-func (cb *ConnectionBuilder) SetParams(params Params) *ConnectionBuilder {
-	cb.connection.params = params
+func (cb *ConnectionBuilder) SetParams(params *Params) *ConnectionBuilder {
+	cb.connection.params = *params
 	return cb
 }
 

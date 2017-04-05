@@ -13,9 +13,17 @@ type Params struct {
 }
 
 // Constructor for `Params`
-func NewParams() Params {
-	return Params{
+func NewParams() *Params {
+	return &Params{
 		stringParams: map[string]string{},
+		intParams:    map[string]int{},
+		fileParams:   map[string]FileWrapper{},
+	}
+}
+
+func QueryParams(stringParams map[string]string) *Params {
+	return &Params{
+		stringParams: stringParams,
 		intParams:    map[string]int{},
 		fileParams:   map[string]FileWrapper{},
 	}

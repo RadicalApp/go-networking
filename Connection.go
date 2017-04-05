@@ -99,7 +99,7 @@ type Connection struct {
 }
 
 // NewConnection creates a new connection with the appropriate Dust auth headers.
-func NewConnection(urlString string, params Params) *Connection {
+func NewConnection(urlString string, params *Params) *Connection {
 	/*
 		Creates a new connection with the appropriate Dust auth headers.
 
@@ -107,7 +107,7 @@ func NewConnection(urlString string, params Params) *Connection {
 		  url (string): The URL to make the request to. (includes full url)
 		  params ([]string): List of key,value strings to add to the request.
 	*/
-	conn := Connection{urlString: urlString, params: params, timeoutInSeconds: 30, headers: map[string]string{}}
+	conn := Connection{urlString: urlString, params: *params, timeoutInSeconds: 30, headers: map[string]string{}}
 
 	return &conn
 }
