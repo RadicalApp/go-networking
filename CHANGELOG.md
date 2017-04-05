@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 
 --- 
 
-## [0.2.0](https://github.com/RadicalApp/go-networking/releases/tag/0.2.1) / 05th'April 2017
+## [0.2.1](https://github.com/RadicalApp/go-networking/releases/tag/0.2.1) / 05th'April 2017
 * Expose `FileWrapper` struct
 * Cleaned up code and added comments
 
