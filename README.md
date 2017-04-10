@@ -1,5 +1,6 @@
 [![Latest Tag](https://img.shields.io/badge/tag-0.2.1-green.svg?style=flat)](https://github.com/RadicalApp/go-networking/releases/tag/0.2.1)
 [![Twitter](https://img.shields.io/badge/twitter-@DustMessaging-blue.svg?style=flat)](https://twitter.com/dustmessaging)
+[![Go Report Card](https://goreportcard.com/report/github.com/RadicalApp/go-networking)](https://goreportcard.com/report/github.com/RadicalApp/go-networking)
 
 # go-networking
 
