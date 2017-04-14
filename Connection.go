@@ -20,6 +20,20 @@ const (
 	HTTP_METHOD_UPLOAD HTTP_METHOD = "UPLOAD"
 )
 
+func (h HTTP_METHOD) getMethodString() string {
+	switch h {
+	case HTTP_METHOD_GET:
+		return "GET"
+	case HTTP_METHOD_POST:
+		return "POST"
+	case HTTP_METHOD_UPLOAD:
+		return "POST"
+	default:
+		return "UNKNOWN_METHOD"
+
+	}
+}
+
 type ConnectionState string
 
 const (
@@ -195,7 +209,7 @@ func (c *Connection) makeRequest(completion func(Response, error)) {
 
 	log.Debug("Method ", string(c.method))
 
-	req, err := http.NewRequest(string(c.method), c.urlString, body)
+	req, err := http.NewRequest(c.method.getMethodString(), c.urlString, body)
 	if err != nil {
 		c.processError(err, completion)
 	} else {
