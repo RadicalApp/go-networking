@@ -24,9 +24,7 @@ func (h HTTP_METHOD) getMethodString() string {
 	switch h {
 	case HTTP_METHOD_GET:
 		return "GET"
-	case HTTP_METHOD_POST:
-		return "POST"
-	case HTTP_METHOD_UPLOAD:
+	case HTTP_METHOD_POST, HTTP_METHOD_UPLOAD:
 		return "POST"
 	default:
 		return "UNKNOWN_METHOD"
@@ -96,6 +94,7 @@ type Connection struct {
 	state            ConnectionState
 	numberOfRetries  int
 	headers          map[string]string
+	contentType      string
 
 	// Basic auth variables
 	basicAuthorization basicAuthorization
@@ -130,6 +129,10 @@ func NewConnection(urlString string, params *Params) *Connection {
 func (c *Connection) SetBasicAuth(username string, password string) {
 	log.Debug("Setting basic authentication.")
 	c.basicAuthorization = basicAuthorization{username: username, password: password}
+}
+
+func (c *Connection) SetContentType(contentType string) {
+	c.contentType = contentType
 }
 
 // Set method type. E.g.: GET, POST
@@ -205,6 +208,9 @@ func (c *Connection) makeRequest(completion func(Response, error)) {
 	}
 	c.changeState(CONNECTION_STATE_DISCONNECTED, CONNECTION_STATE_CONNECTING)
 
+	if len(c.contentType) > 0 {
+		c.PutHeader("Content-Type", c.contentType)
+	}
 	body := c.makeBody()
 
 	log.Debug("Method ", string(c.method))
@@ -228,7 +234,12 @@ func (c *Connection) makeRequest(completion func(Response, error)) {
 }
 
 func (c *Connection) makeParams(req *http.Request) {
-	if c.method != HTTP_METHOD_UPLOAD {
+	if c.method == HTTP_METHOD_UPLOAD {
+		log.Debug("No need to add URL encoded params, sending OCTECT DATA")
+	} else if c.method == HTTP_METHOD_POST && (len(c.params.jsonObjects) > 0) {
+		log.Debug("No need to add URL encoded params, sending a JSON object")
+	} else {
+		log.Debug("Adding URL params")
 		req.URL.RawQuery = c.params.urlEncodeValues()
 	}
 }
@@ -236,6 +247,7 @@ func (c *Connection) makeParams(req *http.Request) {
 func (c *Connection) makeBody() *bytes.Buffer {
 	body := &bytes.Buffer{}
 	if c.method == HTTP_METHOD_UPLOAD {
+		log.Debug("Creating body for multipart form")
 		writer := newByteWriter(body)
 		defer writer.close()
 
@@ -244,11 +256,12 @@ func (c *Connection) makeBody() *bytes.Buffer {
 		}
 
 		isMultipart := false
+		log.Debug(c.params.fileParams)
 		for key, val := range c.params.fileParams {
 			if val.path == "" {
-				_ = writer.writeByteField(key, val.data, val.name)
+				_ = writer.writeByteField(key, val.data, val.name, val.contentType)
 			} else {
-				_ = writer.writeFileField(key, val.path, val.name)
+				_ = writer.writeFileField(key, val.path, val.name, val.contentType)
 			}
 			isMultipart = true
 		}
@@ -256,6 +269,11 @@ func (c *Connection) makeBody() *bytes.Buffer {
 		if isMultipart {
 			c.PutHeader("Content-Type", writer.w.FormDataContentType())
 		}
+		log.Debug("Body: " + body.String())
+	} else if c.method == HTTP_METHOD_POST && (len(c.params.jsonObjects) > 0) {
+		log.Debug("Creating body for JSON object")
+		c.PutHeader("Content-Type", "application/x-www-form-urlencoded")
+		body = bytes.NewBufferString(c.params.Encoded())
 	}
 	return body
 }
@@ -286,20 +304,21 @@ func (c *Connection) changeState(from, to ConnectionState) {
 
 func (c *Connection) processError(err error, completion func(Response, error)) {
 	c.changeState(CONNECTION_STATE_CONNECTED, CONNECTION_STATE_DISCONNECTED)
-	if c.numberOfRetries > 0 {
-		c.numberOfRetries--
-		c.makeRequest(completion)
-	} else {
-		log.Error(err)
-		if c.OnError != nil {
-			c.OnError(err)
-		}
-		if completion != nil {
-			completion(*emptyResponse(), err)
-		}
-		if c.OnClosed != nil {
-			c.OnClosed()
-		}
+	//if c.numberOfRetries > 0 {
+	//	c.numberOfRetries--
+	//	c.makeRequest(completion)
+	//} else {
+	//
+	//}
+	log.Error(err)
+	if c.OnError != nil {
+		c.OnError(err)
+	}
+	if completion != nil {
+		completion(*emptyResponse(), err)
+	}
+	if c.OnClosed != nil {
+		c.OnClosed()
 	}
 }
 
